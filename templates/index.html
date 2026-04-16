@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SUNABACO NEYAGAWA ツイート生成</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 24px;
+    }
+
+    .section-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .category-btn {
+      padding: 12px 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      background: white;
+      font-size: 0.85rem;
+      color: #444;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+      line-height: 1.4;
+    }
+
+    .category-btn:hover {
+      border-color: #aaa;
+    }
+
+    .category-btn.selected {
+      border-color: #1d9bf0;
+      background: #e8f4fd;
+      color: #1d9bf0;
+      font-weight: 600;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 80px;
+      margin-bottom: 20px;
+      transition: border-color 0.15s;
+      background: white;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #1d9bf0;
+    }
+
+    textarea::placeholder {
+      color: #bbb;
+    }
+
+    .generate-btn {
+      width: 100%;
+      padding: 14px;
+      background: #1d9bf0;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .generate-btn:hover:not(:disabled) {
+      background: #1a8cd8;
+    }
+
+    .generate-btn:disabled {
+      background: #a0cef5;
+      cursor: not-allowed;
+    }
+
+    .result-area {
+      margin-top: 28px;
+    }
+
+    .tweet-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .tweet-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #1d9bf0;
+      margin-bottom: 8px;
+    }
+
+    .tweet-text {
+      font-size: 0.9rem;
+      color: #333;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+
+    .copy-btn {
+      margin-top: 10px;
+      padding: 6px 14px;
+      background: transparent;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .copy-btn:hover {
+      background: #f0f0f0;
+    }
+
+    .copy-btn.copied {
+      border-color: #4caf50;
+      color: #4caf50;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 32px;
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #ddd;
+      border-top-color: #1d9bf0;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌴 SUNABACO NEYAGAWA</h1>
+    <p class="subtitle">ツイート生成ツール</p>
+
+    <p class="section-label">カテゴリ</p>
+    <div class="category-grid">
+      {% for key, val in categories.items() %}
+      <button class="category-btn" data-key="{{ key }}" onclick="selectCategory(this, '{{ val }}')">
+        {{ val }}
+      </button>
+      {% endfor %}
+    </div>
+
+    <p class="section-label">今日のネタ（任意）</p>
+    <textarea id="extra-info" placeholder="例：今日は雨、新しい本が入った、体験会が明日など"></textarea>
+
+    <button class="generate-btn" id="generate-btn" onclick="generate()">
+      ✨ ツイート案を生成する
+    </button>
+
+    <div class="result-area" id="result-area"></div>
+  </div>
+
+  <script>
+    let selectedCategory = "";
+
+    function selectCategory(btn, category) {
+      document.querySelectorAll(".category-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      selectedCategory = category;
+    }
+
+    async function generate() {
+      if (!selectedCategory) {
+        alert("カテゴリを選んでください");
+        return;
+      }
+
+      const extraInfo = document.getElementById("extra-info").value.trim();
+      const btn = document.getElementById("generate-btn");
+      const resultArea = document.getElementById("result-area");
+
+      btn.disabled = true;
+      btn.textContent = "生成中...";
+      resultArea.innerHTML = '<div class="loading"><span class="spinner"></span>生成中です...</div>';
+
+      try {
+        const res = await fetch("/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category: selectedCategory, extra_info: extraInfo }),
+        });
+        const data = await res.json();
+        renderResult(data.result);
+      } catch (e) {
+        resultArea.innerHTML = '<div class="loading">エラーが発生しました。もう一度お試しください。</div>';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "✨ ツイート案を生成する";
+      }
+    }
+
+    function renderResult(text) {
+      const resultArea = document.getElementById("result-area");
+      const blocks = text.split(/---\s*案\d+\s*---/).filter(s => s.trim());
+      const labels = text.match(/---\s*(案\d+)\s*---/g) || [];
+
+      resultArea.innerHTML = "";
+
+      blocks.forEach((block, i) => {
+        const card = document.createElement("div");
+        card.className = "tweet-card";
+
+        const label = document.createElement("div");
+        label.className = "tweet-label";
+        label.textContent = labels[i] ? labels[i].replace(/---/g, "").trim() : `案${i + 1}`;
+
+        const tweetText = document.createElement("div");
+        tweetText.className = "tweet-text";
+        tweetText.textContent = block.trim();
+
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "copy-btn";
+        copyBtn.textContent = "コピー";
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(block.trim());
+          copyBtn.textContent = "コピーしました！";
+          copyBtn.classList.add("copied");
+          setTimeout(() => {
+            copyBtn.textContent = "コピー";
+            copyBtn.classList.remove("copied");
+          }, 2000);
+        };
+
+        card.appendChild(label);
+        card.appendChild(tweetText);
+        card.appendChild(copyBtn);
+        resultArea.appendChild(card);
+      });
+    }
+  </script>
+</body>
+</html>
