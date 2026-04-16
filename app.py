@@ -1,9 +1,10 @@
 import os
-import anthropic
+import google.generativeai as genai
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 SCHOOL_INFO = """# SUNABACO NEYAGAWA 教室情報
 
@@ -88,7 +89,7 @@ def generate():
     category = data.get("category", "日常・オープン")
     extra_info = data.get("extra_info", "")
 
-    system_text = (
+    prompt = (
         "あなたはSUNABACO NEYAGAWAというプログラミング・ビジネススクールの"
         "公式Twitterアカウントの中の人です。\n\n"
         "以下の教室情報と過去ツイートのトーンを参考に、ツイートを3案作成してください。\n\n"
@@ -104,27 +105,13 @@ def generate():
         "【出力形式】\n"
         "--- 案1 ---\n（ツイート本文）\n\n"
         "--- 案2 ---\n（ツイート本文）\n\n"
-        "--- 案3 ---\n（ツイート本文）"
-    )
-
-    user_prompt = (
+        "--- 案3 ---\n（ツイート本文）\n\n"
         f"【今回のカテゴリ】\n{category}\n\n"
         f"【追加情報・今日のネタ】\n{extra_info if extra_info else '特になし'}"
     )
 
-    with client.messages.stream(
-        model="claude-opus-4-6",
-        max_tokens=1000,
-        system=[{
-            "type": "text",
-            "text": system_text,
-            "cache_control": {"type": "ephemeral"},
-        }],
-        messages=[{"role": "user", "content": user_prompt}],
-    ) as stream:
-        result = stream.get_final_message().content[0].text
-
-    return jsonify({"result": result})
+    response = model.generate_content(prompt)
+    return jsonify({"result": response.text})
 
 
 if __name__ == "__main__":
